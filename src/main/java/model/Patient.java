@@ -2,7 +2,7 @@ package model;
 
 import java.time.LocalTime;
 
-public class Patient {
+public class Patient implements Comparable<Patient>{
 	
 	public enum ColorCode{
 		NEW, //IN TRIAGE
@@ -11,13 +11,15 @@ public class Patient {
 		OUT // a casa (abbandonato o curato)
 	};
 	
+	private int num;
 	private LocalTime arrivalTime;
 	private ColorCode color;
 	
-	public Patient(LocalTime arrivalTime, ColorCode color) {
+	public Patient(int num, LocalTime arrivalTime, ColorCode color) {
 		super();
 		this.arrivalTime = arrivalTime;
 		this.color = color;
+		this.num=num;
 	}
 
 	public LocalTime getArrivalTime() {
@@ -38,8 +40,47 @@ public class Patient {
 
 	@Override
 	public String toString() {
-		return "Patient [arrivalTime=" + arrivalTime + ", color=" + color + "]";
+		return "Patient [num=" + num + ", arrivalTime=" + arrivalTime + ", color=" + color + "]";
 	}
+
+	@Override
+	public int hashCode() {
+		final int prime = 31;
+		int result = 1;
+		result = prime * result + num;
+		return result;
+	}
+
+	@Override
+	public boolean equals(Object obj) {
+		if (this == obj)
+			return true;
+		if (obj == null)
+			return false;
+		if (getClass() != obj.getClass())
+			return false;
+		Patient other = (Patient) obj;
+		if (num != other.num)
+			return false;
+		return true;
+	}
+
+	@Override
+	public int compareTo(Patient o) {
+		if(this.color.equals(o.color))
+			return this.arrivalTime.compareTo(o.arrivalTime);
+		else if(this.color.equals(Patient.ColorCode.RED))
+			return -1;
+		else if(o.color.equals(Patient.ColorCode.RED))
+			return+1;
+		
+		else if(this.color.equals(Patient.ColorCode.YELLOW))// Y-W
+			return -1;
+		else //W - Y
+		return +1;
+	}
+
+	
 	
 	
 

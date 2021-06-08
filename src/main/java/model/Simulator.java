@@ -17,6 +17,9 @@ public class Simulator {
 	
 	//modello del mondo 
 	private List<Patient> patients;
+	private PriorityQueue<Patient> waitingRoom;
+	//contiene solo i pazienti in attesa -> white, yellow, red 
+	
 	private int freeStudios; //numero studi liberi
 	
 	
@@ -53,6 +56,7 @@ public class Simulator {
 			
 			//inizializza modello del mondo 
 			this.patients= new ArrayList<>();
+			this.waitingRoom= new PriorityQueue<>();
 			this.freeStudios= this.totStudios;
 			this.ultimoColore= ColorCode.RED;
 			
@@ -65,10 +69,11 @@ public class Simulator {
 			LocalTime ora = this.startTime;
 			int inseriti=0;
 			Patient.ColorCode colore= ColorCode.WHITE;
-			
+			this.queue.add(new Event(ora,EventType.TICK,null));
 			while(ora.isBefore(endTime) && inseriti<this.numeroPazienti) {
 				
-				Patient p= new Patient(ora,ColorCode.NEW);
+				Patient p= new Patient(inseriti,ora,ColorCode.NEW);
+				inseriti++;
 				
 				Event e= new Event(ora,EventType.ARRIVAL, p);
 				
@@ -80,6 +85,7 @@ public class Simulator {
 				/*
 				*/
 			}
+			
 		}
 		
 		private Patient.ColorCode prossimoColore(){
@@ -105,7 +111,7 @@ public class Simulator {
 			
 			Patient p= e.getPatient();
 			LocalTime ora= e.getTime();
-			Patient.ColorCode colore = p.getColor();
+			
 			
 			switch(e.getType()) {
 			case ARRIVAL:
@@ -113,37 +119,78 @@ public class Simulator {
 				break;
 			case TRIAGE:
 				p.setColor(prossimoColore());
-				if(p.getColor().equals(Patient.ColorCode.WHITE))
+				if(p.getColor().equals(Patient.ColorCode.WHITE)) {
 					this.queue.add(new Event(ora.plus(Timeout_white), EventType.TIMEOUT, p));
-				else if(p.getColor().equals(Patient.ColorCode.YELLOW))
+					this.waitingRoom.add(p);
+				}
+				else if(p.getColor().equals(Patient.ColorCode.YELLOW)) {
 					this.queue.add(new Event(ora.plus(Timeout_yellow), EventType.TIMEOUT, p));
-				else if(p.getColor().equals(Patient.ColorCode.RED))
+				this.waitingRoom.add(p);
+			}
+				else if(p.getColor().equals(Patient.ColorCode.RED)) {
 					this.queue.add(new Event(ora.plus(Timeout_red), EventType.TIMEOUT, p));
+				this.waitingRoom.add(p);
+		}
 				break;
 			case FREE_STUDIO:
+				if(this.freeStudios==0)
+					return;
+				//quale paziente ha ditirro di entrare
+				Patient primo= this.waitingRoom.poll();
+				if(primo!=null) {
+					//ammetti paziente nello studio
+					if(primo.getColor().equals(Patient.ColorCode.WHITE))
+					this.queue.add(new Event(ora.plus(Duration_white),EventType.TREATED,primo));
+					if(primo.getColor().equals(Patient.ColorCode.YELLOW))
+						this.queue.add(new Event(ora.plus(Duration_yello),EventType.TREATED,primo));
+					if(primo.getColor().equals(Patient.ColorCode.RED))
+						this.queue.add(new Event(ora.plus(Duration_red),EventType.TREATED,primo));
+					primo.setColor(Patient.ColorCode.TREATING);
+					this.freeStudios--;
+					
+				}
+				
 				break;
 			case TIMEOUT:
+				Patient.ColorCode colore = p.getColor();
 				switch(colore) {
 				case WHITE:
+					this.waitingRoom.remove(p);
 					p.setColor(ColorCode.OUT);
 					this.patientsAbadoned++;
 					break;
 					
 				case YELLOW:
+					this.waitingRoom.remove(p);
 					p.setColor(ColorCode.RED);
 					this.queue.add(new Event(ora.plus(Timeout_red), EventType.TIMEOUT, p));
+					this.waitingRoom.add(p);
+					
 					break;
 					
-				case RED: 
+				case RED:
+					this.waitingRoom.remove(p);
 					p.setColor(ColorCode.BLACK);
 					this.patientsDead++;
 					break;
 					default: 
-						System.out.print("ERRORE: TIMEOUT CON COLORE: "+colore);
+						//System.out.print("ERRORE: TIMEOUT CON COLORE: "+colore);
 				}
 				break;
-			
+			case TREATED:
+				this.patientsTreated++;
+				p.setColor(Patient.ColorCode.OUT);
+				this.freeStudios++;
+				this.queue.add(new Event(ora,EventType.FREE_STUDIO,null));
+				break;
+			case TICK:
+				if(this.freeStudios>0 && !this.waitingRoom.isEmpty())
+					this.queue.add(new Event(ora,EventType.FREE_STUDIO,null));
+				if(ora.isBefore(endTime))
+				this.queue.add(new Event(ora.plus(Duration.ofMinutes(5)),EventType.TICK,null));
+				break;
 			}
+			
 			
 		}
 	
